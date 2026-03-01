@@ -39,7 +39,10 @@ jobs:
       - name: Build the mod
         uses: geode-sdk/build-geode-mod@main
         with:
+          # Using "combine: true" here tells the action to save 
+          # the .geode files for the final 'package' job
           combine: true
+          # You can keep nightly, or use 'v5.2.0' for stability
           sdk: nightly
           cli: nightly
           target: ${{ matrix.config.target }}
@@ -50,10 +53,13 @@ jobs:
     needs: ['build']
 
     steps:
+      # This pulls the .geode files from all previous matrix jobs 
+      # and merges them into a single multi-platform .geode file
       - uses: geode-sdk/build-geode-mod/combine@main
         id: build
 
       - uses: actions/upload-artifact@v4
         with:
           name: Build Output
+          # This will contain your final .geode file
           path: ${{ steps.build.outputs.build-output }}
