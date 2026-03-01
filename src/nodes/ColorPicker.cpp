@@ -21,11 +21,11 @@ void ColorPicker::updateColor(cocos2d::ccColor4B const &color) {
     m_callback(color);
 }
 
-void ColorPicker::onPickColor(CCObject*) {
-    auto picker = geode::ColorPickPopup::create(m_color);
-    picker->setDelegate(this);
-    picker->setColorTarget(m_colorSprite);
-    picker->show();
+auto picker = ColorPickPopup::create(initialColor);
+picker->setCallback([this](cocos2d::ccColor4B const& color) {
+    this->updateColor(color);
+});
+picker->show();
 }
 
 ColorPicker* ColorPicker::create(cocos2d::ccColor4B const &value, std::function<void(cocos2d::ccColor4B const &)> const &callback) {
