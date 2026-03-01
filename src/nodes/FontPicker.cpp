@@ -1,6 +1,13 @@
+#include <Geode/Geode.hpp>
+#include <Geode/ui/Popup.hpp>
 #include "FontPicker.hpp"
+#include <array>
+#include <algorithm>
 
-constexpr std::array FontFiles = {
+using namespace geode::prelude;
+
+// Helper arrays for font data
+static constexpr std::array FontFiles = {
     "bigFont.fnt", "chatFont.fnt", "goldFont.fnt", "gjFont01.fnt",
     "gjFont02.fnt", "gjFont03.fnt", "gjFont04.fnt", "gjFont05.fnt",
     "gjFont06.fnt", "gjFont07.fnt", "gjFont08.fnt", "gjFont09.fnt",
@@ -19,7 +26,7 @@ constexpr std::array FontFiles = {
     "gjFont58.fnt", "gjFont59.fnt",
 };
 
-constexpr std::array FontNames = {
+static constexpr std::array FontNames = {
     "Pusab", "Aller", "Gold Pusab", "FONT01",
     "FONT02", "FONT03", "FONT04", "FONT05",
     "FONT06", "FONT07", "FONT08", "FONT09",
@@ -38,40 +45,16 @@ constexpr std::array FontNames = {
     "Lo-Sumires", "Gewtymol",
 };
 
-void FontPickerPopup::updateFont() const {
+// --- FontPickerPopup Implementation ---
+
+void FontPickerPopup::updateFont() {
     auto font = FontFiles[m_fontIndex];
     m_fontLabel->setFntFile(font);
     m_fontLabel->setString(lookupFont(font).c_str());
     m_fontLabel->limitLabelWidth(150.f, 1.f, 0.1f);
 }
 
-FontPickerPopup* FontPickerPopup::create(std::string const& font, std::function<void(std::string const&)> const& callback) {
-    auto ret = new FontPickerPopup;
-    if (ret->initAnchored(300.f, 200.f, font, callback)) {
-        ret->autorelease();
-        return ret;
-    }
-    delete ret;
-    return nullptr;
-}
-
-size_t FontPickerPopup::getFontIndex(std::string const &fontFile) {
-    auto index = std::ranges::find(FontFiles, fontFile) - FontFiles.begin();
-    if (index == FontFiles.size()) {
-        return 0;
-    }
-    return index;
-}
-
-std::string FontPickerPopup::lookupFont(std::string const &fontFile) {
-    auto index = std::ranges::find(FontFiles, fontFile) - FontFiles.begin();
-    if (index == FontFiles.size()) {
-        return FontNames[0];
-    }
-    return FontNames[index];
-}
-
-bool FontPickerPopup::setup(std::string const &font, std::function<void(std::string const &)> const &callback) {
+bool FontPickerPopup::setup(std::string const& font, std::function<void(std::string const&)> const& callback) {
     this->setTitle("Select a font");
 
     m_fontIndex = getFontIndex(font);
@@ -80,6 +63,7 @@ bool FontPickerPopup::setup(std::string const &font, std::function<void(std::str
     m_fontLabel->setAnchorPoint({ 0.5f, 0.5f });
     m_fontLabel->setID("font-label"_spr);
     m_mainLayer->addChildAtPosition(m_fontLabel, geode::Anchor::Center);
+    
     updateFont();
 
     auto sprNext = cocos2d::CCSprite::createWithSpriteFrameName("GJ_arrow_02_001.png");
@@ -90,7 +74,6 @@ bool FontPickerPopup::setup(std::string const &font, std::function<void(std::str
     );
     m_nextFontButton->setID("next-font-button"_spr);
     m_buttonMenu->addChildAtPosition(m_nextFontButton, geode::Anchor::Right, { -30.f, 0 });
-
 
     m_prevFontButton = geode::cocos::CCMenuItemExt::createSpriteExtraWithFrameName(
         "GJ_arrow_02_001.png", 0.6f, [this](auto s) { prevFont(s); }
@@ -112,23 +95,46 @@ bool FontPickerPopup::setup(std::string const &font, std::function<void(std::str
     return true;
 }
 
-void FontPickerPopup::nextFont(CCObject*) {
+void FontPickerPopup::nextFont(cocos2d::CCObject*) {
     m_fontIndex = (m_fontIndex + 1) % FontFiles.size();
     updateFont();
 }
 
-void FontPickerPopup::prevFont(CCObject*) {
+void FontPickerPopup::prevFont(cocos2d::CCObject*) {
     m_fontIndex = (m_fontIndex + FontFiles.size() - 1) % FontFiles.size();
     updateFont();
 }
 
-bool FontPicker::init(std::string const &font, std::function<void(std::string const &)> const &callback) {
+size_t FontPickerPopup::getFontIndex(std::string const& fontFile) {
+    auto it = std::find(FontFiles.begin(), FontFiles.end(), fontFile);
+    if (it == FontFiles.end()) return 0;
+    return std::distance(FontFiles.begin(), it);
+}
+
+std::string FontPickerPopup::lookupFont(std::string const& fontFile) {
+    auto index = getFontIndex(fontFile);
+    return FontNames[index];
+}
+
+FontPickerPopup* FontPickerPopup::create(std::string const& font, std::function<void(std::string const&)> const& callback) {
+    auto ret = new FontPickerPopup;
+    if (ret && ret->initAnchored(300.f, 200.f, font, callback)) {
+        ret->autorelease();
+        return ret;
+    }
+    CC_SAFE_DELETE(ret);
+    return nullptr;
+}
+
+// --- FontPicker Button Implementation ---
+
+bool FontPicker::init(std::string const& font, std::function<void(std::string const&)> const& callback) {
     auto spr = ButtonSprite::create("A", 10.f, true, font.c_str(), "GJ_button_05.png", 24.f, 0.4);
     if (!spr) return false;
 
     spr->setScale(0.75f);
     m_fontLabel = spr->getChildByType<cocos2d::CCLabelBMFont>(0);
-    m_fontLabel->limitLabelWidth(10.f, 2.f, 0.1f);
+    if (m_fontLabel) m_fontLabel->limitLabelWidth(10.f, 2.f, 0.1f);
 
     m_font = font;
     m_callback = callback;
@@ -139,30 +145,27 @@ bool FontPicker::init(std::string const &font, std::function<void(std::string co
     return true;
 }
 
-void FontPicker::onPickFont(CCObject*) {
+void FontPicker::onPickFont(cocos2d::CCObject*) {
     FontPickerPopup::create(m_font, [this](std::string const& newFont) {
         m_callback(newFont);
         this->setFont(newFont);
     })->show();
 }
 
+void FontPicker::setFont(std::string const& font) {
+    m_font = font;
+    if (m_fontLabel) {
+        m_fontLabel->setFntFile(font.c_str());
+        m_fontLabel->limitLabelWidth(10.f, 2.f, 0.1f);
+    }
+}
+
 FontPicker* FontPicker::create(std::string const& font, std::function<void(std::string const&)> const& callback) {
     auto ret = new FontPicker;
-    if (ret->init(font, callback)) {
+    if (ret && ret->init(font, callback)) {
         ret->autorelease();
         return ret;
     }
-    delete ret;
+    CC_SAFE_DELETE(ret);
     return nullptr;
-}
-
-void FontPicker::setFont(std::string const &font) {
-    geode::log::debug("FontPicker::setFont: {}", font);
-    m_font = font;
-    if (!m_fontLabel) {
-        geode::log::error("FontPicker::setFont: m_fontLabel is null");
-        return;
-    }
-    m_fontLabel->setFntFile(font.c_str());
-    m_fontLabel->limitLabelWidth(10.f, 2.f, 0.1f);
 }
