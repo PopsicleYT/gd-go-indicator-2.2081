@@ -2,7 +2,7 @@
 
 struct IndicatorData;
 
-class LevelIndicatorsList : public geode::Popup<std::string const&> {
+class LevelIndicatorsList : public geode::Popup<> {
 protected:
     bool setup(std::string const& id) override;
     cocos2d::CCMenu* createIndicatorCell(IndicatorData& data, int index);
