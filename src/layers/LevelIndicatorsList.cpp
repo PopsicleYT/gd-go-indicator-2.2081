@@ -1,3 +1,9 @@
+#include <Geode/Geode.hpp>
+#include <Geode/ui/Popup.hpp>
+#include <Geode/ui/ColorPickPopup.hpp>
+
+using namespace geode::prelude;
+
 #include "LevelIndicatorsList.hpp"
 #include "../GoIndicatorPlayLayer.hpp"
 #include "../structs/IndicatorData.hpp"
@@ -13,12 +19,17 @@ std::string unescapeNewlines(std::string const& text) {
     return geode::utils::string::replace(text, "\\n", "\n");
 }
 
-bool LevelIndicatorsList::setup(std::string const &id) {
+bool LevelIndicatorsList::setup(std::string const& id) {
     this->setTitle("Progress Indicators");
-    m_title->setPositionX(170.f);
+    
+    // In Geode v5, m_title is m_titleLabel
+    if (m_titleLabel) {
+        m_titleLabel->setPositionX(170.f);
+    }
 
     m_levelId = id;
     m_indicators = IndicatorData::getIndicators(id);
+    
     m_scrollLayer = geode::ScrollLayer::create({0.f, 0.f, 320.f, 215.f});
     m_scrollLayer->setAnchorPoint({ 0, 0.5f });
     m_scrollLayer->setID("scroll-layer"_spr);
@@ -34,10 +45,11 @@ bool LevelIndicatorsList::setup(std::string const &id) {
     m_mainLayer->addChildAtPosition(scrollBg, geode::Anchor::BottomLeft, {10.f, 10.f});
 
     auto togglerMenu = cocos2d::CCMenu::create();
-    togglerMenu->setContentSize(m_size);
+    togglerMenu->setContentSize(m_mainLayer->getContentSize());
     togglerMenu->setPosition({0, 0});
     togglerMenu->setAnchorPoint({0, 0});
     togglerMenu->setID("toggler-menu"_spr);
+    
     m_enableToggler = geode::cocos::CCMenuItemExt::createTogglerWithStandardSprites(0.6f, [this](auto) {
         auto enabled = IndicatorData::hasIndicators(m_levelId);
         IndicatorData::setIndicatorsEnabled(m_levelId, !enabled);
@@ -85,7 +97,7 @@ bool LevelIndicatorsList::setup(std::string const &id) {
             ->setAxisReverse(true)
             ->setAutoScale(false)
             ->setCrossAxisOverflow(true)
-            ->setAutoGrowAxis(this->getContentHeight())
+            ->setAllowCrossAxisOverflow(true)
             ->setAxisAlignment(geode::AxisAlignment::End)
             ->setGap(2)
     );
@@ -102,7 +114,6 @@ cocos2d::CCMenu* LevelIndicatorsList::createIndicatorCell(IndicatorData& data, i
     cell->setAnchorPoint({0, 0});
     cell->setID(fmt::format("indicator-cell-{}", index));
 
-    // add background
     auto bg = cocos2d::extension::CCScale9Sprite::create("GJ_square02.png");
     bg->setContentSize({310.f, 40.f});
     bg->setAnchorPoint({1, 1});
@@ -110,7 +121,6 @@ cocos2d::CCMenu* LevelIndicatorsList::createIndicatorCell(IndicatorData& data, i
     bg->setID("background"_spr);
     cell->addChild(bg);
 
-    // delete button
     auto deleteButton = geode::cocos::CCMenuItemExt::createSpriteExtraWithFrameName("GJ_deleteIcon_001.png", 0.6f, [this, index](auto) {
         m_indicators.erase(m_indicators.begin() + index);
         this->refreshList();
@@ -118,14 +128,12 @@ cocos2d::CCMenu* LevelIndicatorsList::createIndicatorCell(IndicatorData& data, i
     deleteButton->setID("delete-button"_spr);
     cell->addChildAtPosition(deleteButton, geode::Anchor::Left, {20.f, 0});
 
-    // percentage slider
     auto percentageSlider = FloatSlider::create(0.0, 100.0, data.percentage, [this, index](auto value) {
         m_indicators[index].percentage = value;
     });
     percentageSlider->setID("percentage-slider"_spr);
     cell->addChildAtPosition(percentageSlider, geode::Anchor::BottomLeft, {35.f, 10.f});
 
-    // toggle button
     auto toggleButton = geode::cocos::CCMenuItemExt::createTogglerWithStandardSprites(0.5f, [this, index](auto) {
         m_indicators[index].enabled = !m_indicators[index].enabled;
     });
@@ -133,7 +141,6 @@ cocos2d::CCMenu* LevelIndicatorsList::createIndicatorCell(IndicatorData& data, i
     toggleButton->setID("toggle-button"_spr);
     cell->addChildAtPosition(toggleButton, geode::Anchor::BottomLeft, {135.f, 20.f});
 
-    // label input
     auto labelInput = geode::TextInput::create(190.f, "Go!", "chatFont.fnt");
     labelInput->setFilter("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()-_=+[]{};:'\",.<>/?\\|`~ ");
     labelInput->setCallback([this, index](std::string const& text) {
@@ -144,14 +151,12 @@ cocos2d::CCMenu* LevelIndicatorsList::createIndicatorCell(IndicatorData& data, i
     labelInput->setID("label-input"_spr);
     cell->addChildAtPosition(labelInput, geode::Anchor::BottomLeft, {205.f, 20.f});
 
-    // font picker
     FontPicker* fontPickerBtn = FontPicker::create(m_indicators[index].font, [this, index](auto font) {
         m_indicators[index].font = font;
     });
     fontPickerBtn->setID("font-picker-button"_spr);
     cell->addChildAtPosition(fontPickerBtn, geode::Anchor::BottomLeft, {275.f, 20.f});
 
-    // color picker
     auto colorPickerBtn = ColorPicker::create(data.color, [this, index](auto color) {
         m_indicators[index].color = color;
     });
@@ -165,7 +170,7 @@ void LevelIndicatorsList::refreshList() {
     auto layer = m_scrollLayer->m_contentLayer;
     layer->removeAllChildrenWithCleanup(true);
 
-    for (int i = 0; i < m_indicators.size(); i++) {
+    for (int i = 0; i < (int)m_indicators.size(); i++) {
         auto cell = createIndicatorCell(m_indicators[i], i);
         layer->addChild(cell);
     }
@@ -174,16 +179,17 @@ void LevelIndicatorsList::refreshList() {
     layer->setLayout(
         geode::ColumnLayout::create()
             ->setAxisReverse(true)
-            ->setAutoGrowAxis(height)
+            ->setAllowCrossAxisOverflow(true)
             ->setAxisAlignment(geode::AxisAlignment::End)
             ->setGap(2)
     );
 
     layer->setContentSize({ 320.f, height });
+    layer->updateLayout();
     m_scrollLayer->scrollToTop();
 }
 
-LevelIndicatorsList * LevelIndicatorsList::create(std::string const &id) {
+LevelIndicatorsList* LevelIndicatorsList::create(std::string const& id) {
     auto ret = new LevelIndicatorsList;
     if (ret->initAnchored(420.f, 260.f, id)) {
         ret->autorelease();
@@ -194,7 +200,7 @@ LevelIndicatorsList * LevelIndicatorsList::create(std::string const &id) {
 }
 
 void LevelIndicatorsList::onExit() {
-    Popup::onExit();
+    geode::Popup<std::string const&>::onExit();
     IndicatorData::saveIndicators(m_levelId, m_indicators);
     if (auto pl = static_cast<GoIndicatorPlayLayer*>(PlayLayer::get()))
         pl->recreateIndicators();
