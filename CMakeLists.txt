@@ -8,7 +8,7 @@ else()
     set(CMAKE_OSX_ARCHITECTURES "arm64;x86_64")
 endif()
 
-project(GoIndicator VERSION 1.0.0)
+project(GoIndicator VERSION 2.0.0)
 
 add_library(${PROJECT_NAME} SHARED
     src/main.cpp
